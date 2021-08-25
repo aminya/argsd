@@ -437,7 +437,7 @@ private bool isBool(string str) @safe pure {
 }
 
 bool parseArgsImpl(string mem, string Long, string Short, Opt, Args)(
-		ref Opt opt, string prefix, ref Args args)
+		ref Opt opt, string prefix, ref Args args) @safe
 {
 	import std.traits : hasUDA, getUDAs, isArray, isSomeString;
 	import std.algorithm.searching : canFind;
@@ -726,7 +726,7 @@ void printArgsHelp(Opt)(ref const(Opt) opt, string header, const(size_t)
 }
 
 void printArgsHelp(LTW, Opt)(ref LTW ltw, ref const(Opt) opt, string header,
-		const(size_t) termWidth = getTerminalWidth())
+		const(size_t) termWidth = getTerminalWidth()) @safe
 {
 	import std.format : formattedWrite;
 	formattedWrite(ltw, "%s\n", header);
@@ -739,7 +739,7 @@ void printArgsHelp(LTW, Opt)(ref LTW ltw, ref const(Opt) opt, string header,
 		);
 }
 
-string ArgsUnqual(T)() {
+string ArgsUnqual(T)() @safe nothrow {
 	import std.traits : Unqual, isArray;
 	import std.range.primitives : ElementType;
 	static if(isArray!(T)) {
