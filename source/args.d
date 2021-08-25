@@ -308,14 +308,14 @@ struct Argument {
 	char shortName = '\0';
 	Optional optional = Optional.yes;
 
-	this(T...)(T args) @safe {
+	this(T...)(T args) @safe @nogc nothrow pure {
 		static if(T.length > 0) {
 			this.isArgument = true;
 			construct(0, args);
 		}
 	}
 
-	void construct(T...)(T args) @safe {
+	void construct(T...)(T args) @safe @nogc nothrow pure {
 		import std.traits : isSomeString, isSomeChar;
 		static if(isSomeString!(T[0])) {
 			this.helpMessage = args[0];
@@ -331,11 +331,11 @@ struct Argument {
 	}
 }
 
-Argument Arg(T...)(T args) {
+Argument Arg(T...)(T args) @safe @nogc nothrow pure {
 	return Argument(args);
 }
 
-Argument getArgs(alias T)() {
+Argument getArgs(alias T)() @safe @nogc nothrow pure {
 	import std.traits : hasUDA, getUDAs;
 	static if(hasUDA!(T, Argument)) {
 		return Argument(getUDAs!(T, Argument)[0].helpMessage,
