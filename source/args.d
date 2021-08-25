@@ -308,14 +308,14 @@ struct Argument {
 	char shortName = '\0';
 	Optional optional = Optional.yes;
 
-	this(T...)(T args) @safe {
+	this(T...)(T args) @safe @nogc nothrow pure {
 		static if(T.length > 0) {
 			this.isArgument = true;
 			construct(0, args);
 		}
 	}
 
-	void construct(T...)(T args) @safe {
+	void construct(T...)(T args) @safe @nogc nothrow pure {
 		import std.traits : isSomeString, isSomeChar;
 		static if(isSomeString!(T[0])) {
 			this.helpMessage = args[0];
@@ -331,11 +331,11 @@ struct Argument {
 	}
 }
 
-Argument Arg(T...)(T args) {
+Argument Arg(T...)(T args) @safe @nogc nothrow pure {
 	return Argument(args);
 }
 
-Argument getArgs(alias T)() {
+Argument getArgs(alias T)() @safe @nogc nothrow pure {
 	import std.traits : hasUDA, getUDAs;
 	static if(hasUDA!(T, Argument)) {
 		return Argument(getUDAs!(T, Argument)[0].helpMessage,
@@ -385,15 +385,15 @@ enum ArgsMatch {
 }
 
 ArgsMatch argsMatches(alias Args, string name, string Long, string Short)(
-		string prefix, string opt) @safe
+		string prefix, string opt) @safe @nogc nothrow
 {
-	import std.array : Appender, appender;
+	import bc.string : String, nogcFormat;
 	import std.format : formattedWrite;
 	import std.algorithm.searching : startsWith, canFind;
 	//import std.stdio;
 
-	Appender!string buf = appender!string();
-	formattedWrite(buf, "%s%s%s", Long, prefix, name);
+	String buf;
+	buf ~= nogcFormat!"%s%s%s"(Long, prefix, name);
 
 	//writeln("argsMatches ", buf.getData(), "' '", prefix, "' '", opt, "'");
 	if(opt.startsWith(buf.data)) {
@@ -405,11 +405,11 @@ ArgsMatch argsMatches(alias Args, string name, string Long, string Short)(
 		return ArgsMatch.none;
 	}
 
-	buf = appender!string();
-	formattedWrite(buf, "%s%s", Short, Args.shortName);
-	//writeln("argsMatches short ", buf.getData(), "' '", prefix, "' '", opt, "'");
+	String buf2;
+	buf2 ~= nogcFormat!"%s%s"(Short, Args.shortName);
+	//writeln("argsMatches short ", buf2.getData(), "' '", prefix, "' '", opt, "'");
 
-	if(buf.data == opt) {
+	if(buf2.data == opt) {
 		return ArgsMatch.complete;
 	}
 
@@ -437,7 +437,7 @@ private bool isBool(string str) @safe pure {
 }
 
 bool parseArgsImpl(string mem, string Long, string Short, Opt, Args)(
-		ref Opt opt, string prefix, ref Args args)
+		ref Opt opt, string prefix, ref Args args) @safe
 {
 	import std.traits : hasUDA, getUDAs, isArray, isSomeString;
 	import std.algorithm.searching : canFind;
@@ -585,7 +585,7 @@ struct UniqueShort {
 	int[128] used;
 }
 
-UniqueShort checkUniqueRecur(Opt)() @safe {
+UniqueShort checkUniqueRecur(Opt)() @safe @nogc nothrow pure {
 	import std.traits : hasUDA, getUDAs;
 	UniqueShort ret;
 	foreach(mem; __traits(allMembers, Opt)) {
@@ -611,16 +611,13 @@ UniqueShort checkUniqueRecur(Opt)() @safe {
 }
 
 void checkUnique(Opt)() @safe {
-	import std.array : appender;
-	import std.format : formattedWrite;
+	import bc.string: String, nogcFormat;
 	enum unique = checkUniqueRecur!(Opt)();
 	bool ok = true;
-	string errMsg;
-	auto app = appender!string();
+	String errMsg;
 	foreach(idx, it; unique.used) {
 		if(it > 1) {
-			formattedWrite(app,
-					"The short option name '%s' was used %d times.\n",
+			errMsg ~= nogcFormat!"The short option name '%s' was used %d times.\n"(
 					cast(char)idx, it
 				);
 			ok = false;
@@ -628,14 +625,12 @@ void checkUnique(Opt)() @safe {
 	}
 
 	if(unique.used[cast(size_t)'h'] == 1) {
-		formattedWrite(app,
-				"The short option name 'h' are not allowed as they are "
-				~ "reservered the help dialog.\n");
+		errMsg ~= "The short option name 'h' are not allowed as they are reservered the help dialog.\n";
 		ok = false;
 	}
 
 	if(!ok) {
-		throw new Exception(app.data);
+		throw new Exception(errMsg.dup);
 	}
 }
 
@@ -665,7 +660,7 @@ private bool parseArgs(string Long, string Short, Opt, Args)(ref Opt opt,
 	return helpWanted;
 }
 
-size_t longOptionsWidth(Opt)(string prefix = "") @safe {
+size_t longOptionsWidth(Opt)(string prefix = "") @safe @nogc nothrow  {
 	import std.traits : hasUDA;
 	import std.algorithm.comparison : max;
 	size_t ret;
@@ -682,7 +677,7 @@ size_t longOptionsWidth(Opt)(string prefix = "") @safe {
 	return ret + prefix.length;
 }
 
-size_t typeWidth(Opt)() @safe {
+size_t typeWidth(Opt)() @safe @nogc nothrow {
 	import std.traits : hasUDA, Unqual;
 	import std.algorithm.comparison : max;
 	size_t ret;
@@ -701,13 +696,11 @@ size_t typeWidth(Opt)() @safe {
 	return ret;
 }
 
-size_t defaultWidth(Opt)(const ref Opt opt) @safe {
-	import std.array : appender;
+size_t defaultWidth(Opt)(const ref Opt opt) @safe @nogc nothrow {
+	import bc.string: String, nogcFormat;
 	import std.traits : hasUDA, Unqual;
 	import std.algorithm.comparison : max;
-	import std.format : formattedWrite;
 
-	auto buf = appender!string();
 	size_t ret;
 	foreach(mem; __traits(allMembers, Opt)) {
 		static if(hasUDA!(__traits(getMember, Opt, mem), Argument)) {
@@ -716,9 +709,8 @@ size_t defaultWidth(Opt)(const ref Opt opt) @safe {
 					(__traits(getMember, opt, mem));
 				ret = max(ret, s);
 			} else {
-				buf = appender!string();
-				formattedWrite(buf, "%s", __traits(getMember, opt, mem));
-				ret = max(ret, buf.data.length);
+				auto buf = nogcFormat!"%s"(__traits(getMember, opt, mem));
+				ret = max(ret, buf.length);
 			}
 		}
 	}
@@ -734,7 +726,7 @@ void printArgsHelp(Opt)(ref const(Opt) opt, string header, const(size_t)
 }
 
 void printArgsHelp(LTW, Opt)(ref LTW ltw, ref const(Opt) opt, string header,
-		const(size_t) termWidth = getTerminalWidth())
+		const(size_t) termWidth = getTerminalWidth()) @safe
 {
 	import std.format : formattedWrite;
 	formattedWrite(ltw, "%s\n", header);
@@ -747,7 +739,7 @@ void printArgsHelp(LTW, Opt)(ref LTW ltw, ref const(Opt) opt, string header,
 		);
 }
 
-string ArgsUnqual(T)() {
+string ArgsUnqual(T)() @safe nothrow {
 	import std.traits : Unqual, isArray;
 	import std.range.primitives : ElementType;
 	static if(isArray!(T)) {
